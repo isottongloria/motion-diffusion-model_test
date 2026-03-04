@@ -41,7 +41,7 @@ class Text2MotionDataset(data.Dataset):
         for name in tqdm(id_list):
             try:
                 motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
-                if (len(motion)) < min_motion_len or (len(motion) >= 200):
+                if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                     continue
                 text_data = []
                 flag = False
@@ -130,6 +130,8 @@ class Text2MotionDataset(data.Dataset):
         self.max_length = length
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -239,7 +241,7 @@ class Text2MotionDatasetV2(data.Dataset):
             for name in tqdm(id_list):
                 try:
                     motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
-                    if (len(motion)) < min_motion_len or (len(motion) >= 200):
+                    if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                         continue
                     text_data = []
                     flag = False
@@ -256,7 +258,10 @@ class Text2MotionDatasetV2(data.Dataset):
 
                             text_dict['caption'] = caption
                             text_dict['tokens'] = tokens
-                            if f_tag == 0.0 and to_tag == 0.0:
+                            if self.opt.no_motion_cutting:
+                                flag = True
+                                text_data.append(text_dict)
+                            elif f_tag == 0.0 and to_tag == 0.0:
                                 flag = True
                                 text_data.append(text_dict)
                             else:
@@ -307,6 +312,8 @@ class Text2MotionDatasetV2(data.Dataset):
         self.max_length = length
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -340,30 +347,36 @@ class Text2MotionDatasetV2(data.Dataset):
         pos_one_hots = np.concatenate(pos_one_hots, axis=0)
         word_embeddings = np.concatenate(word_embeddings, axis=0)
 
-        # Crop the motions in to times of 4, and introduce small variations
-        if self.opt.unit_length < 10:
-            coin2 = np.random.choice(['single', 'single', 'double'])
-        else:
-            coin2 = 'single'
-
-        if coin2 == 'double':
-            m_length = (m_length // self.opt.unit_length - 1) * self.opt.unit_length
-        elif coin2 == 'single':
-            m_length = (m_length // self.opt.unit_length) * self.opt.unit_length
-        
         original_length = None
-        if self.opt.fixed_len > 0:
-            # Crop fixed_len
-            original_length = m_length
-            m_length = self.opt.fixed_len
-        
-        idx = random.randint(0, len(motion) - m_length)
-        if self.opt.disable_offset_aug:
-            idx = random.randint(0, self.opt.unit_length)
-        motion = motion[idx:idx+m_length]
+        if self.opt.no_motion_cutting:
+            m_length = len(motion)
+            idx = 0
+            motion = motion[idx:idx+m_length]
+        else:
+            # Crop the motions in to times of 4, and introduce small variations
+            if self.opt.unit_length < 10:
+                coin2 = np.random.choice(['single', 'single', 'double'])
+            else:
+                coin2 = 'single'
+
+            if coin2 == 'double':
+                m_length = (m_length // self.opt.unit_length - 1) * self.opt.unit_length
+            elif coin2 == 'single':
+                m_length = (m_length // self.opt.unit_length) * self.opt.unit_length
+
+            if self.opt.fixed_len > 0:
+                # Crop fixed_len
+                original_length = m_length
+                m_length = self.opt.fixed_len
+
+            idx = random.randint(0, len(motion) - m_length)
+            if self.opt.disable_offset_aug:
+                idx = random.randint(0, self.opt.unit_length)
+            motion = motion[idx:idx+m_length]
 
         "Z Normalization"
-        motion = (motion - self.mean) / self.std
+        if self.opt.normalize:
+            motion = (motion - self.mean) / self.std
 
         if m_length < self.max_motion_length:
             motion = np.concatenate([motion,
@@ -399,7 +412,7 @@ class Text2MotionDatasetBaseline(data.Dataset):
         for name in tqdm(id_list):
             try:
                 motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
-                if (len(motion)) < min_motion_len or (len(motion) >= 200):
+                if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                     continue
                 text_data = []
                 flag = False
@@ -462,6 +475,8 @@ class Text2MotionDatasetBaseline(data.Dataset):
         self.max_length = length
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -586,6 +601,8 @@ class MotionDatasetV2(data.Dataset):
         print("Total number of motions {}, snippets {}".format(len(self.data), self.cumsum[-1]))
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -640,6 +657,8 @@ class RawTextDataset(data.Dataset):
         return word_list, pos_list
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -733,6 +752,8 @@ class TextOnlyDataset(data.Dataset):
         self.name_list = new_name_list
 
     def inv_transform(self, data):
+        if hasattr(self, 'opt') and not getattr(self.opt, 'normalize', False):
+            return data
         return data * self.std + self.mean
 
     def __len__(self):
@@ -773,6 +794,8 @@ class HumanML3D(data.Dataset):
         opt.meta_dir = pjoin(abs_base_path, './dataset')
         opt.use_cache = kwargs.get('use_cache', True)
         opt.fixed_len = kwargs.get('fixed_len', 0)
+        opt.normalize = kwargs.get('normalize', False)
+        opt.no_motion_cutting = kwargs.get('no_motion_cutting', True)
         if opt.fixed_len > 0:
             opt.max_motion_length = opt.fixed_len
         is_autoregressive = kwargs.get('autoregressive', False)
@@ -803,8 +826,12 @@ class HumanML3D(data.Dataset):
             self.t2m_dataset = Text2MotionDatasetV2(self.opt, self.mean, self.std, self.split_file, self.w_vectorizer)
             self.num_actions = 1 # dummy placeholder
 
-        self.mean_gpu = torch.tensor(self.mean).to(device)[None, :, None, None]
-        self.std_gpu = torch.tensor(self.std).to(device)[None, :, None, None]
+        if self.opt.normalize:
+            self.mean_gpu = torch.tensor(self.mean).to(device)[None, :, None, None]
+            self.std_gpu = torch.tensor(self.std).to(device)[None, :, None, None]
+        else:
+            self.mean_gpu = torch.zeros((1, len(self.mean), 1, 1), device=device)
+            self.std_gpu = torch.ones((1, len(self.std), 1, 1), device=device)
 
         assert len(self.t2m_dataset) > 1, 'You loaded an empty dataset, ' \
                                           'it is probably because your data dir has only texts and no motions.\n' \

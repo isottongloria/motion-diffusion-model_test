@@ -43,7 +43,9 @@ def main():
                               num_frames=args.num_frames, 
                               fixed_len=args.pred_len + args.context_len, 
                               pred_len=args.pred_len,
-                              device=dist_util.dev(),)
+                              device=dist_util.dev(),
+                              normalize=args.normalize,
+                              no_motion_cutting=args.no_motion_cutting,)
 
     print("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)

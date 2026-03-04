@@ -140,6 +140,12 @@ def add_data_options(parser):
                        help="Dataset name (choose from list).")
     group.add_argument("--data_dir", default="", type=str,
                        help="If empty, will use defaults according to the specified dataset.")
+    group.add_argument("--normalize", "--normlize", dest='normalize', action='store_true',
+                       help="If set, applies z-normalization in dataset loading and de-normalization in output transforms.")
+    group.add_argument("--no_motion_cutting", dest='no_motion_cutting', action='store_true', default=True,
+                       help="If set (default), keeps full motion clips without temporal cutting/splitting.")
+    group.add_argument("--allow_motion_cutting", dest='no_motion_cutting', action='store_false',
+                       help="Re-enables HumanML temporal splitting/cropping behavior.")
 
 
 def add_training_options(parser):
