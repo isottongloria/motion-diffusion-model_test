@@ -294,14 +294,18 @@ if __name__ == '__main__':
     split = 'test'
     gt_loader = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=None, split=split, hml_mode='gt',
                                   normalize=args.normalize,
-                                  no_motion_cutting=args.no_motion_cutting)
+                                  no_motion_cutting=args.no_motion_cutting,
+                                            use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                                            expression_dim=getattr(args, 'expression_dim', 10))
     # gen_loader = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=None, split=split, hml_mode='eval')
     # added new features + support for prefix completion:
     gen_loader = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=None, split=split, hml_mode='eval',
                                     fixed_len=args.context_len+args.pred_len, pred_len=args.pred_len, device=dist_util.dev(),
                                     autoregressive=args.autoregressive,
                                     normalize=args.normalize,
-                                    no_motion_cutting=args.no_motion_cutting)
+                                    no_motion_cutting=args.no_motion_cutting,
+                                            use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                                            expression_dim=getattr(args, 'expression_dim', 10))
 
     num_actions = gen_loader.dataset.num_actions
 

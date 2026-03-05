@@ -48,6 +48,18 @@ def get_model_args(args, data):
         njoints = 251
         nfeats = 1
 
+    if args.dataset in ['humanml', 'kit'] and getattr(args, 'use_6d_rotation', False):
+        if not hasattr(data.dataset, 'mean'):
+            raise ValueError('Could not infer feature dimension for 6D rotation setup.')
+        axis_angle_dim = int(len(data.dataset.mean))
+        expr_dim = int(getattr(args, 'expression_dim', 10))
+        if expr_dim >= axis_angle_dim:
+            raise ValueError(f'expression_dim ({expr_dim}) must be smaller than feature dim ({axis_angle_dim}).')
+        rot_dim = axis_angle_dim - expr_dim
+        if rot_dim % 3 != 0:
+            raise ValueError(f'Rotational dim ({rot_dim}) must be divisible by 3 for axis-angle features.')
+        njoints = (rot_dim // 3) * 6 + expr_dim
+
     # Compatibility with old models
     if not hasattr(args, 'pred_len'):
         args.pred_len = 0
@@ -92,6 +104,8 @@ def create_gaussian_diffusion(args):
     else:
         lambda_target_loc = 0.
 
+    lambda_expression = getattr(args, 'lambda_expression', 0.)
+
     return SpacedDiffusion(
         use_timesteps=space_timesteps(steps, timestep_respacing),
         betas=betas,
@@ -113,6 +127,7 @@ def create_gaussian_diffusion(args):
         lambda_rcxyz=args.lambda_rcxyz,
         lambda_fc=args.lambda_fc,
         lambda_target_loc=lambda_target_loc,
+        lambda_expression=lambda_expression,
     )
 
 def load_saved_model(model, model_path, use_avg: bool=False):  # use_avg_model

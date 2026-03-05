@@ -137,6 +137,7 @@ class GaussianDiffusion:
         lambda_vel_rcxyz=0.,
         lambda_fc=0.,
         lambda_target_loc=0.,
+        lambda_expression=0.,
         **kargs,
     ):
         self.model_mean_type = model_mean_type
@@ -157,6 +158,7 @@ class GaussianDiffusion:
         self.lambda_root_vel = lambda_root_vel
         self.lambda_vel_rcxyz = lambda_vel_rcxyz
         self.lambda_fc = lambda_fc
+        self.lambda_expression = lambda_expression
 
         if self.lambda_rcxyz > 0. or self.lambda_vel > 0. or self.lambda_root_vel > 0. or \
                 self.lambda_vel_rcxyz > 0. or self.lambda_fc > 0. or self.lambda_target_loc > 0.:
@@ -1297,7 +1299,17 @@ class GaussianDiffusion:
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape  # [bs, njoints, nfeats, nframes]
 
-            terms["rot_mse"] = self.masked_l2(target, model_output, mask) # mean_flat(rot_mse)
+            use_6d_rotation = bool(model_kwargs.get('y', {}).get('use_6d_rotation', False))
+            expression_dim = int(model_kwargs.get('y', {}).get('expression_dim', 0))
+            if use_6d_rotation and expression_dim > 0:
+                if expression_dim >= target.shape[1]:
+                    raise ValueError(f'expression_dim ({expression_dim}) must be smaller than feature dim ({target.shape[1]}).')
+                target_rot_only, target_expr = target[:, :-expression_dim, :, :], target[:, -expression_dim:, :, :]
+                model_rot_only, model_expr = model_output[:, :-expression_dim, :, :], model_output[:, -expression_dim:, :, :]
+                terms["rot_mse"] = self.masked_l2(target_rot_only, model_rot_only, mask)
+                terms["expression_mse"] = self.masked_l2(target_expr, model_expr, mask)
+            else:
+                terms["rot_mse"] = self.masked_l2(target, model_output, mask) # mean_flat(rot_mse)
 
             target_xyz, model_output_xyz = None, None
 
@@ -1351,7 +1363,8 @@ class GaussianDiffusion:
                             (self.lambda_vel * terms.get('vel_mse', 0.)) +\
                             (self.lambda_rcxyz * terms.get('rcxyz_mse', 0.)) + \
                             (self.lambda_target_loc * terms.get('target_loc', 0.)) + \
-                            (self.lambda_fc * terms.get('fc', 0.))
+                            (self.lambda_fc * terms.get('fc', 0.)) + \
+                            (self.lambda_expression * terms.get('expression_mse', 0.))
 
         else:
             raise NotImplementedError(self.loss_type)
