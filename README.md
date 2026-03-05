@@ -389,6 +389,14 @@ python -m visualize.render_mesh --input_path /path/to/mp4/stick/figure/file
   1. A more straightforward way is using the mesh data itself. All meshes have the same topology (SMPL), so you just need to keyframe vertex locations. 
      Since the OBJs are not preserving vertices order, we also save this data to the `sample##_rep##_smpl_params.npy` file for your convenience.
 
+
+## Phoenix qualitative evaluation (angles -> SMPL-X -> short videos)
+
+For a rigid qualitative evaluation pipeline that converts angular features to SMPL-X joints and renders short GT/prediction comparison videos, see:
+
+- [`eval/QUALITATIVE_EVAL.md`](eval/QUALITATIVE_EVAL.md)
+- [`eval/phoenix_qualitative_eval.py`](eval/phoenix_qualitative_eval.py)
+
 ## Motion Editing
 
 * This feature is available for text-to-motion datasets (HumanML3D and KIT).
