@@ -193,6 +193,16 @@ def add_training_options(parser):
                        help="Number of repetitions, per sample (text prompt/action)")
     group.add_argument("--gen_guidance_param", default=2.5, type=float,
                        help="For classifier-free sampling - specifies the s parameter, as defined in the paper.")
+    group.add_argument("--save_eval_checkpoints", default='', type=str,
+                       help="If set, enables periodic Phoenix evaluation during training and saves outputs in this directory.")
+    group.add_argument("--eval_every_epochs", default=100, type=int,
+                       help="Run periodic Phoenix evaluation every N epochs (used with --save_eval_checkpoints).")
+    group.add_argument("--phoenix_eval_num_samples", default=30, type=int,
+                       help="Number of samples for periodic Phoenix eval generation.")
+    group.add_argument("--phoenix_eval_num_mp4", default=5, type=int,
+                       help="Number of rendered mp4 files copied in periodic Phoenix eval artifacts.")
+    group.add_argument("--phoenix_eval_config", default='', type=str,
+                       help="Path to config JSON for tools/test_phoenix.py. Required when --save_eval_checkpoints is set.")
     
     group.add_argument("--avg_model_beta", default=0.9999, type=float, help="Average model beta (for EMA).")
     group.add_argument("--adam_beta2", default=0.999, type=float, help="Adam beta2.")
