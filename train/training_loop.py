@@ -1,6 +1,9 @@
 import copy
 import functools
 import os
+import shutil
+import subprocess
+import sys
 import time
 from types import SimpleNamespace
 import numpy as np
@@ -250,6 +253,9 @@ class TrainLoop:
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.total_step() > 0:
                         return
                 self.step += 1
+
+            self.periodic_phoenix_eval(epoch)
+
             if not (not self.lr_anneal_steps or self.total_step() < self.lr_anneal_steps):
                 break
         # Save the last checkpoint if it wasn't already saved.
@@ -391,6 +397,67 @@ class TrainLoop:
         all_sample_save_path = generate(gen_args)
         self.train_platform.report_media(title='Motion', series='Predicted Motion', iteration=self.total_step(),
                                          local_path=all_sample_save_path)        
+
+    def periodic_phoenix_eval(self, epoch: int):
+        save_root = getattr(self.args, 'save_eval_checkpoints', '')
+        if not save_root:
+            return
+        every_epochs = max(1, int(getattr(self.args, 'eval_every_epochs', 100)))
+        if (epoch + 1) % every_epochs != 0:
+            return
+
+        phoenix_cfg = getattr(self.args, 'phoenix_eval_config', '')
+        if not phoenix_cfg:
+            raise ValueError('When --save_eval_checkpoints is enabled, --phoenix_eval_config must be provided.')
+
+        # Ensure there is a checkpoint for this exact training state.
+        self.save()
+        ckpt_path = os.path.join(self.save_dir, self.ckpt_file_name())
+
+        epoch_dir = os.path.join(save_root, f'epoch_{epoch + 1:04d}')
+        samples_dir = os.path.join(epoch_dir, 'samples')
+        metrics_dir = os.path.join(epoch_dir, 'metrics')
+        mp4_dir = os.path.join(epoch_dir, 'mp4')
+        os.makedirs(samples_dir, exist_ok=True)
+        os.makedirs(metrics_dir, exist_ok=True)
+        os.makedirs(mp4_dir, exist_ok=True)
+
+        # Generate 30 samples (default) to keep visual artifacts and a reproducible snapshot.
+        gen_args = copy.deepcopy(self.args)
+        gen_args.model_path = ckpt_path
+        gen_args.output_dir = samples_dir
+        gen_args.num_samples = int(getattr(self.args, 'phoenix_eval_num_samples', 30))
+        gen_args.num_repetitions = 1
+        gen_args.guidance_param = self.args.gen_guidance_param
+        gen_args.motion_length = 6
+        gen_args.input_text = gen_args.text_prompt = gen_args.action_file = gen_args.action_name = gen_args.dynamic_text_path = ''
+        if gen_args.multi_target_cond:
+            gen_args.sampling_mode = 'goal'
+            gen_args.target_joint_source = 'data'
+        generated_dir = generate(gen_args)
+
+        # Keep only a compact set of rendered mp4 files in a dedicated subfolder.
+        max_mp4 = max(0, int(getattr(self.args, 'phoenix_eval_num_mp4', 5)))
+        generated_mp4 = sorted([
+            os.path.join(generated_dir, f)
+            for f in os.listdir(generated_dir)
+            if f.endswith('.mp4') and f.startswith('sample') and '_rep' in f
+        ])
+        for src in generated_mp4[:max_mp4]:
+            shutil.copy2(src, os.path.join(mp4_dir, os.path.basename(src)))
+
+        metrics_json = os.path.join(metrics_dir, 'phoenix_metrics.json')
+        cmd = [
+            sys.executable,
+            os.path.join('tools', 'test_phoenix.py'),
+            '--config', phoenix_cfg,
+            '--device', 'cuda' if torch.cuda.is_available() else 'cpu',
+            '--limit', str(int(getattr(self.args, 'phoenix_eval_num_samples', 30))),
+            '--output-json', metrics_json,
+            '--keep-generated',
+        ]
+        print('[PhoenixEval] Running:', ' '.join(cmd))
+        subprocess.run(cmd, check=True)
 
     
     def find_resume_checkpoint(self) -> Optional[str]:
