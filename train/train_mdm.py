@@ -45,7 +45,9 @@ def main():
                               pred_len=args.pred_len,
                               device=dist_util.dev(),
                               normalize=args.normalize,
-                              no_motion_cutting=args.no_motion_cutting,)
+                              no_motion_cutting=args.no_motion_cutting,
+                              use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                              expression_dim=getattr(args, 'expression_dim', 10),)
 
     print("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)

@@ -51,7 +51,9 @@ def main():
                               split='test',
                               hml_mode='train',
                               normalize=args.normalize,
-                              no_motion_cutting=args.no_motion_cutting)  # in train mode, you get both text and motion.
+                              no_motion_cutting=args.no_motion_cutting,
+                                            use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                                            expression_dim=getattr(args, 'expression_dim', 10))  # in train mode, you get both text and motion.
     # data.fixed_length = n_frames
     total_num_samples = args.num_samples * args.num_repetitions
 

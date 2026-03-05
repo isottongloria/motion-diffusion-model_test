@@ -113,6 +113,8 @@ def add_model_options(parser):
     group.add_argument("--lambda_vel", default=0.0, type=float, help="Joint velocity loss.")
     group.add_argument("--lambda_fc", default=0.0, type=float, help="Foot contact loss.")
     group.add_argument("--lambda_target_loc", default=0.0, type=float, help="For HumanML only, when . L2 with target location.")
+    group.add_argument("--lambda_expression", default=0.0, type=float,
+                       help="Expression channels loss weight when using --use_6d_rotation.")
     group.add_argument("--unconstrained", action='store_true',
                        help="Model is trained unconditionally. That is, it is constrained by neither text nor action. "
                             "Currently tested on HumanAct12 only.")
@@ -146,6 +148,10 @@ def add_data_options(parser):
                        help="If set (default), keeps full motion clips without temporal cutting/splitting.")
     group.add_argument("--allow_motion_cutting", dest='no_motion_cutting', action='store_false',
                        help="Re-enables HumanML temporal splitting/cropping behavior.")
+    group.add_argument("--use_6d_rotation", action='store_true',
+                       help="Convert rotational channels axis-angle -> matrix -> 6D while keeping trailing expression channels unchanged.")
+    group.add_argument("--expression_dim", default=10, type=int,
+                       help="Number of trailing expression channels to leave untouched when rotation conversion is enabled.")
 
 
 def add_training_options(parser):

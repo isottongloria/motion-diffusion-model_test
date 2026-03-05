@@ -47,6 +47,10 @@ def get_args():
     args.lambda_vel = 0.0
     args.lambda_rcxyz = 0.0
     args.lambda_fc   = 0.0
+    args.normalize = False
+    args.no_motion_cutting = True
+    args.use_6d_rotation = False
+    args.expression_dim = 10
     return args
 
 
@@ -66,7 +70,9 @@ class Predictor(BasePredictor):
                                   split='test',
                                   hml_mode='text_only',
                                   normalize=self.args.normalize,
-                                  no_motion_cutting=self.args.no_motion_cutting)
+                                  no_motion_cutting=self.args.no_motion_cutting,
+                                  use_6d_rotation=getattr(self.args, 'use_6d_rotation', False),
+                                  expression_dim=getattr(self.args, 'expression_dim', 10))
 
         self.data.fixed_length = float(self.num_frames)
 
@@ -105,7 +111,9 @@ class Predictor(BasePredictor):
                                   split='test',
                                   hml_mode='text_only',
                                   normalize=self.args.normalize,
-                                  no_motion_cutting=self.args.no_motion_cutting)
+                                  no_motion_cutting=self.args.no_motion_cutting,
+                                  use_6d_rotation=getattr(self.args, 'use_6d_rotation', False),
+                                  expression_dim=getattr(self.args, 'expression_dim', 10))
 
         collate_args = [{'inp': torch.zeros(self.num_frames), 'tokens': None, 'lengths': self.num_frames, 'text': str(prompt)}]
         _, model_kwargs = collate(collate_args)

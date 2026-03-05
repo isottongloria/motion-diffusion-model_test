@@ -113,13 +113,17 @@ class TrainLoop:
                                             autoregressive=args.autoregressive,
                                             fixed_len=args.context_len+args.pred_len, pred_len=args.pred_len, device=dist_util.dev(),
                                             normalize=args.normalize,
-                                            no_motion_cutting=args.no_motion_cutting)
+                                            no_motion_cutting=args.no_motion_cutting,
+                                            use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                                            expression_dim=getattr(args, 'expression_dim', 10))
 
             self.eval_gt_data = get_dataset_loader(name=args.dataset, batch_size=args.eval_batch_size, num_frames=None,
                                                    split=args.eval_split,
                                                    hml_mode='gt', device=dist_util.dev(),
                                             normalize=args.normalize,
-                                            no_motion_cutting=args.no_motion_cutting)
+                                            no_motion_cutting=args.no_motion_cutting,
+                                            use_6d_rotation=getattr(args, 'use_6d_rotation', False),
+                                            expression_dim=getattr(args, 'expression_dim', 10))
             self.eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
             self.eval_data = {
                 'test': lambda: eval_humanml.get_mdm_loader(self.args,
@@ -321,6 +325,9 @@ class TrainLoop:
             assert self.microbatch == self.batch_size
             micro = batch
             micro_cond = cond
+            micro_cond.setdefault('y', {})
+            micro_cond['y']['use_6d_rotation'] = getattr(self.args, 'use_6d_rotation', False)
+            micro_cond['y']['expression_dim'] = getattr(self.args, 'expression_dim', 10)
             last_batch = (i + self.microbatch) >= batch.shape[0]
             t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
 

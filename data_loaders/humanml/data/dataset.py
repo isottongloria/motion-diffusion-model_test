@@ -11,12 +11,43 @@ import spacy
 from torch.utils.data._utils.collate import default_collate
 from data_loaders.humanml.utils.word_vectorizer import WordVectorizer
 from data_loaders.humanml.utils.get_opt import get_opt
+from utils.rotation_conversions import (
+    axis_angle_to_matrix,
+    matrix_to_rotation_6d,
+)
 
 # import spacy
 
 def collate_fn(batch):
     batch.sort(key=lambda x: x[3], reverse=True)
     return default_collate(batch)
+
+
+def maybe_convert_axis_angle_to_6d(motion, use_6d_rotation=False, expression_dim=10):
+    if not use_6d_rotation:
+        return motion
+    if motion.ndim != 2:
+        raise ValueError(f"Expected motion shape [frames, dim], got {motion.shape}.")
+
+    total_dim = motion.shape[1]
+    expr_dim = max(0, int(expression_dim))
+    if expr_dim >= total_dim:
+        raise ValueError(f"expression_dim ({expr_dim}) must be smaller than total dim ({total_dim}).")
+
+    rot_dim = total_dim - expr_dim
+    if rot_dim % 3 != 0:
+        raise ValueError(f"Rotational dim ({rot_dim}) must be divisible by 3 for axis-angle input.")
+
+    motion_t = torch.from_numpy(motion).float()
+    rot_axis_angle = motion_t[:, :rot_dim].reshape(-1, 3)
+    rot_mats = axis_angle_to_matrix(rot_axis_angle)
+    rot_6d = matrix_to_rotation_6d(rot_mats).reshape(motion_t.shape[0], -1)
+
+    if expr_dim > 0:
+        motion_t = torch.cat([rot_6d, motion_t[:, -expr_dim:]], dim=1)
+    else:
+        motion_t = rot_6d
+    return motion_t.numpy().astype(motion.dtype, copy=False)
 
 
 '''For use of training text-2-motion generative model'''
@@ -41,6 +72,7 @@ class Text2MotionDataset(data.Dataset):
         for name in tqdm(id_list):
             try:
                 motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
+                motion = maybe_convert_axis_angle_to_6d(motion, getattr(self.opt, 'use_6d_rotation', False), getattr(self.opt, 'expression_dim', 10))
                 if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                     continue
                 text_data = []
@@ -228,7 +260,9 @@ class Text2MotionDatasetV2(data.Dataset):
         length_list = []
 
         _split = os.path.basename(split_file).replace('.txt', '')
-        _name =''
+        _name = ''
+        if getattr(self.opt, 'use_6d_rotation', False):
+            _name += f"_rot6d_expr{getattr(self.opt, 'expression_dim', 10)}"
         # cache_path = os.path.join(opt.meta_dir, self.opt.dataset_name + '_' + _split + _name + '.npy')
         cache_path = os.path.join(opt.cache_dir, 'dataset', self.opt.dataset_name + '_' + _split + _name + '.npy')
         if opt.use_cache and os.path.exists(cache_path):
@@ -241,6 +275,7 @@ class Text2MotionDatasetV2(data.Dataset):
             for name in tqdm(id_list):
                 try:
                     motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
+                    motion = maybe_convert_axis_angle_to_6d(motion, getattr(self.opt, 'use_6d_rotation', False), getattr(self.opt, 'expression_dim', 10))
                     if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                         continue
                     text_data = []
@@ -412,6 +447,7 @@ class Text2MotionDatasetBaseline(data.Dataset):
         for name in tqdm(id_list):
             try:
                 motion = np.load(pjoin(opt.motion_dir, name + '.npy'))
+                motion = maybe_convert_axis_angle_to_6d(motion, getattr(self.opt, 'use_6d_rotation', False), getattr(self.opt, 'expression_dim', 10))
                 if (len(motion)) < min_motion_len or (len(motion) >= 200 and not self.opt.no_motion_cutting):
                     continue
                 text_data = []
@@ -796,6 +832,10 @@ class HumanML3D(data.Dataset):
         opt.fixed_len = kwargs.get('fixed_len', 0)
         opt.normalize = kwargs.get('normalize', False)
         opt.no_motion_cutting = kwargs.get('no_motion_cutting', True)
+        opt.use_6d_rotation = kwargs.get('use_6d_rotation', False)
+        opt.expression_dim = kwargs.get('expression_dim', 10)
+        if opt.use_6d_rotation and opt.normalize:
+            raise ValueError('use_6d_rotation currently requires --normalize to be disabled.')
         if opt.fixed_len > 0:
             opt.max_motion_length = opt.fixed_len
         is_autoregressive = kwargs.get('autoregressive', False)
