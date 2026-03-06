@@ -173,6 +173,7 @@ def save_comparison_mp4(
     title: str | None = None,
     hide_lower_body: bool = True,
     gloss_labels: list[str] | None = None,
+    metrics_text: str | None = None,
 ):
     output_mp4.parent.mkdir(parents=True, exist_ok=True)
 
@@ -197,6 +198,12 @@ def save_comparison_mp4(
         0.5, 0.03, "",
         ha="center", va="center",
         fontsize=14, fontweight="bold", color="white",
+        bbox=dict(boxstyle="round,pad=0.35", facecolor="black", alpha=0.65, edgecolor="none"),
+    )
+    metric_overlay = fig.text(
+        0.98, 0.96, metrics_text or "",
+        ha="right", va="top",
+        fontsize=10, color="white",
         bbox=dict(boxstyle="round,pad=0.35", facecolor="black", alpha=0.65, edgecolor="none"),
     )
     axs = [
@@ -268,6 +275,7 @@ def save_comparison_mp4(
             gloss_text.set_text(f"Gloss: {g}")
         else:
             gloss_text.set_text("")
+        metric_overlay.set_text(metrics_text or "")
 
     anim = FuncAnimation(fig, update, frames=nframes, interval=1000 / max(fps, 1), repeat=False)
     writer = FFMpegWriter(fps=fps, bitrate=3500)
